@@ -20,6 +20,7 @@ export function useSectionStore() {
                 const parsed = JSON.parse(stored);
                 // Self-healing: Deduplicate by slug on load
                 const unique = parsed.reduce((acc: CustomSection[], current: CustomSection) => {
+                    if (!current || !current.slug) return acc;
                     const x = acc.find(item => item.slug === current.slug);
                     if (!x) {
                         return acc.concat([current]);

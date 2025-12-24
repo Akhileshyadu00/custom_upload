@@ -1,119 +1,169 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { Search, Plus } from "lucide-react";
+import React, { useState, useMemo } from "react";
 import { SectionCard } from "@/components/shared/SectionCard";
-import { sections as staticSections, Section } from "@/data/sections";
-import { useSectionStore, CustomSection } from "@/lib/section-store";
+import { sections, Niche } from "@/data/sections";
+import { motion, AnimatePresence } from "framer-motion";
+import { Search, X, Plus } from "lucide-react";
+import { useSectionStore } from "@/lib/section-store";
 import Link from "next/link";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { cn } from "@/lib/utils";
+
+const niches: Niche[] = [
+    "Beauty", "Electronics", "Dropshipping", "Fashion", "Fitness",
+    "Home Decor", "Jewelry", "Luxury", "Minimal", "Ready-To-Use Templates"
+];
 
 export default function SectionsPage() {
-    const [searchQuery, setSearchQuery] = useState("");
-    const [activeCategory, setActiveCategory] = useState("All");
     const { customSections, mounted } = useSectionStore();
-    const [activeTab, setActiveTab] = useState("all");
+    const [selectedNiches, setSelectedNiches] = useState<Niche[]>([]);
+    const [searchQuery, setSearchQuery] = useState("");
 
-    // Merge sections
-    const [allSections, setAllSections] = useState<Section[]>(staticSections);
+    const allSections = useMemo(() => {
+        return [...sections, ...customSections];
+    }, [customSections]);
 
-    useEffect(() => {
-        if (mounted) {
-            setAllSections([...(customSections as Section[]), ...staticSections]);
-        } else {
-            setAllSections(staticSections);
-        }
-    }, [mounted, customSections]);
+    const filteredSections = useMemo(() => {
+        return allSections.filter((section) => {
+            const matchesSearch = section.name.toLowerCase().includes(searchQuery.toLowerCase());
+            const matchesNiche = selectedNiches.length === 0 ||
+                (section.niches || []).some((n) => selectedNiches.includes(n));
+            return matchesSearch && matchesNiche;
+        });
+    }, [searchQuery, selectedNiches, allSections]);
 
-    // Derive categories
-    const categories = ["All", ...Array.from(new Set(allSections.map((s) => s.category)))];
+    const toggleNiche = (niche: Niche) => {
+        setSelectedNiches((prev) =>
+            prev.includes(niche) ? prev.filter((n) => n !== niche) : [...prev, niche]
+        );
+    };
 
-    const filteredSections = allSections.filter((section) => {
-        const matchesSearch = section.name.toLowerCase().includes(searchQuery.toLowerCase());
-        const matchesCategory = activeCategory === "All" || section.category === activeCategory;
-        const matchesTab = activeTab === "all"
-            ? true
-            : activeTab === "custom"
-                ? (section as any).isCustom
-                : !(section as any).isCustom;
-
-        return matchesSearch && matchesCategory && matchesTab;
-    });
+    if (!mounted) {
+        return (
+            <div className="flex min-h-screen flex-col bg-muted/20">
+                <main className="flex-1">
+                    <div className="container mx-auto px-4 py-12">
+                        <div className="animate-pulse space-y-8">
+                            <div className="h-10 w-64 bg-muted rounded"></div>
+                            <div className="h-12 w-full bg-muted rounded-xl"></div>
+                            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                                {[1, 2, 3, 4, 5, 6].map(i => (
+                                    <div key={i} className="aspect-video bg-muted rounded-xl"></div>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                </main>
+            </div>
+        );
+    }
 
     return (
-        <div className="min-h-screen bg-gray-50 pt-24 pb-12">
-            <div className="container mx-auto px-4">
-                {/* Header */}
-                <div className="mb-10 flex flex-col md:flex-row gap-4 items-center justify-between">
-                    <div>
-                        <h1 className="text-4xl font-bold mb-2">Section Library</h1>
-                        <p className="text-gray-500">Explore premium sections for your store.</p>
-                    </div>
-                    <Link href="/upload">
-                        <Button className="bg-black text-white hover:bg-zinc-800 rounded-full">
-                            <Plus className="mr-2 h-4 w-4" /> Upload Custom Section
-                        </Button>
-                    </Link>
-                </div>
-
-                {/* Controls */}
-                <div className="flex flex-col lg:flex-row gap-6 mb-10 items-center justify-between">
-                    <div className="flex flex-1 items-center gap-4 w-full lg:w-auto">
-                        {/* Search */}
-                        <div className="relative w-full lg:w-96">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-                            <Input
-                                placeholder="Search sections..."
-                                className="pl-10 bg-white border-gray-200 rounded-full"
-                                value={searchQuery}
-                                onChange={(e) => setSearchQuery(e.target.value)}
-                            />
+        <div className="flex min-h-screen flex-col bg-muted/20">
+            <main className="flex-1">
+                <div className="container mx-auto px-4 py-12">
+                    {/* Header */}
+                    <div className="mb-12">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <h1 className="text-4xl font-bold tracking-tight">Browse Sections</h1>
+                                <p className="mt-2 text-muted-foreground">Find the perfect block for your Shopify store.</p>
+                            </div>
+                            <Link
+                                href="/upload"
+                                className="inline-flex h-10 items-center justify-center gap-2 rounded-full bg-primary px-6 text-sm font-semibold text-primary-foreground transition-all hover:scale-105"
+                            >
+                                <Plus className="h-4 w-4" />
+                                Create New
+                            </Link>
                         </div>
                     </div>
 
-                    <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full lg:w-auto">
-                        <TabsList className="grid w-full grid-cols-3 lg:w-[400px]">
-                            <TabsTrigger value="all">All Sections</TabsTrigger>
-                            <TabsTrigger value="premium">Premium</TabsTrigger>
-                            <TabsTrigger value="custom">My Uploads</TabsTrigger>
-                        </TabsList>
-                    </Tabs>
-                </div>
+                    {/* Controls */}
+                    <div className="mb-8 flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+                        {/* Search Bar */}
+                        <div className="relative w-full lg:max-w-md">
+                            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                            <input
+                                type="text"
+                                placeholder="Search by name..."
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                className="h-12 w-full rounded-xl border bg-background pl-10 pr-4 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
+                            />
+                        </div>
 
-                {/* Categories */}
-                <div className="flex flex-wrap gap-2 mb-8">
-                    {categories.map((cat) => (
-                        <Button
-                            key={cat}
-                            variant={activeCategory === cat ? "default" : "outline"}
-                            onClick={() => setActiveCategory(cat)}
-                            className={`rounded-full ${activeCategory === cat ? "bg-black text-white" : "bg-white border-gray-200 text-gray-600 hover:bg-gray-100"}`}
-                        >
-                            {cat}
-                        </Button>
-                    ))}
-                </div>
-
-                {/* Grid */}
-                {filteredSections.length > 0 ? (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                        {filteredSections.map((section) => (
-                            <SectionCard key={section.slug} section={section} />
-                        ))}
+                        {/* Niche Pills */}
+                        <div className="flex flex-wrap gap-2">
+                            <button
+                                onClick={() => setSelectedNiches([])}
+                                className={cn(
+                                    "h-9 rounded-full px-4 text-xs font-semibold transition-all",
+                                    selectedNiches.length === 0 ? "bg-primary text-primary-foreground" : "border bg-background hover:bg-muted"
+                                )}
+                            >
+                                All Niches
+                            </button>
+                            {niches.map((niche) => (
+                                <button
+                                    key={niche}
+                                    onClick={() => toggleNiche(niche)}
+                                    className={cn(
+                                        "h-9 rounded-full px-4 text-xs font-semibold transition-all",
+                                        selectedNiches.includes(niche) ? "bg-primary text-primary-foreground" : "border bg-background hover:bg-muted"
+                                    )}
+                                >
+                                    {niche}
+                                </button>
+                            ))}
+                        </div>
                     </div>
-                ) : (
-                    <div className="text-center py-20">
-                        <p className="text-gray-500 text-lg">No sections found matching your criteria.</p>
-                        {activeTab === 'custom' && (
-                            <Link href="/upload" className="mt-4 inline-block text-indigo-600 hover:underline">
-                                Create your first section &rarr;
-                            </Link>
+
+                    {/* Results Summary */}
+                    <div className="mb-6 flex items-center justify-between text-sm text-muted-foreground">
+                        <p>Showing {filteredSections.length} sections</p>
+                        {selectedNiches.length > 0 && (
+                            <button
+                                onClick={() => setSelectedNiches([])}
+                                className="flex items-center gap-1 text-primary hover:underline"
+                            >
+                                Clear all <X className="h-3 w-3" />
+                            </button>
                         )}
                     </div>
-                )}
-            </div>
+
+                    {/* Grid */}
+                    <AnimatePresence mode="popLayout">
+                        <motion.div
+                            layout
+                            className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
+                        >
+                            {filteredSections.map((section) => (
+                                <motion.div
+                                    key={section.slug}
+                                    layout
+                                    initial={{ opacity: 0, scale: 0.9 }}
+                                    animate={{ opacity: 1, scale: 1 }}
+                                    exit={{ opacity: 0, scale: 0.9 }}
+                                    transition={{ duration: 0.2 }}
+                                >
+                                    <SectionCard section={section} />
+                                </motion.div>
+                            ))}
+                        </motion.div>
+                    </AnimatePresence>
+
+                    {filteredSections.length === 0 && (
+                        <div className="flex flex-col items-center justify-center py-24 text-center">
+                            <div className="mb-4 rounded-full bg-muted p-6">
+                                <Search className="h-10 w-10 text-muted-foreground" />
+                            </div>
+                            <h3 className="text-xl font-bold">No sections found</h3>
+                            <p className="text-muted-foreground">Try adjusting your filters or search query.</p>
+                        </div>
+                    )}
+                </div>
+            </main>
         </div>
     );
 }

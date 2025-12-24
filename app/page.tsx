@@ -1,117 +1,135 @@
 "use client";
 
-import Link from "next/link";
-import { ArrowRight, CheckCircle2, Zap, LayoutTemplate } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { motion } from "framer-motion";
-import { sections } from "@/data/sections";
+import { Navbar } from "@/components/shared/Navbar";
 import { SectionCard } from "@/components/shared/SectionCard";
+import { sections } from "@/data/sections";
+import { ArrowRight, Sparkles, Code2, Zap } from "lucide-react";
+import Link from "next/link";
 
 export default function Home() {
+  const featuredSections = sections.slice(0, 6);
+
   return (
-    <div className="flex flex-col min-h-screen">
-      {/* Hero Section */}
-      <section className="relative pt-32 pb-20 md:pt-48 md:pb-32 overflow-hidden">
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-indigo-100/50 via-white to-white -z-10"></div>
+    <div className="flex min-h-screen flex-col">
+      <main className="flex-1">
+        {/* Hero Section */}
+        <section className="relative overflow-hidden bg-background py-20 lg:py-32">
+          <div className="absolute inset-0 z-0">
+            <div className="absolute top-0 right-0 h-[500px] w-[500px] rounded-full bg-primary/10 blur-[100px]" />
+            <div className="absolute bottom-0 left-0 h-[500px] w-[500px] rounded-full bg-primary/5 blur-[100px]" />
+          </div>
 
-        <div className="container px-4 mx-auto text-center max-w-4xl">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5 }}
-          >
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-50 border border-indigo-100 text-indigo-600 text-sm font-medium mb-6">
-              <Zap className="h-4 w-4" />
-              <span>Speed up your Shopify development</span>
-            </div>
+          <div className="container relative z-10 mx-auto px-4 text-center">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5 }}
+              className="mb-6 inline-flex items-center gap-2 rounded-full border bg-muted/50 px-4 py-1.5 text-sm font-medium"
+            >
+              <Sparkles className="h-4 w-4 text-primary" />
+              <span>Premium Shopify Sections Library</span>
+            </motion.div>
 
-            <h1 className="text-5xl md:text-7xl font-bold tracking-tight text-slate-900 mb-6 leading-tight">
-              Build. Copy. Launch.<br />
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-purple-600">
-                Premium Shopify Sections
-              </span>
-              <br />in One Click.
-            </h1>
+            <motion.h1
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.1 }}
+              className="mx-auto mb-6 max-w-4xl text-5xl font-extrabold tracking-tight lg:text-7xl"
+            >
+              Scale Your <span className="text-primary italic">Store</span> Faster with Custom Liquid Blocks
+            </motion.h1>
 
-            <p className="text-xl text-slate-600 mb-10 max-w-2xl mx-auto leading-relaxed">
-              Stop coding from scratch. Access a library of high-quality, conversion-optimized Shopify sections. Copy Liquid, CSS, and Schema instantly.
-            </p>
+            <motion.p
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.2 }}
+              className="mx-auto mb-10 max-w-2xl text-lg text-muted-foreground lg:text-xl"
+            >
+              Copy-paste premium, high-converting Shopify sections. No apps needed. Just clean, optimized code for your theme.
+            </motion.p>
 
-            <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
-              <Button asChild size="lg" className="h-14 px-8 text-lg rounded-full bg-slate-900 hover:bg-slate-800 text-white shadow-xl hover:shadow-2xl hover:-translate-y-1 transition-all">
-                <Link href="/sections">
-                  View Sections <ArrowRight className="ml-2 h-5 w-5" />
-                </Link>
-              </Button>
-              <Button variant="outline" size="lg" className="h-14 px-8 text-lg rounded-full border-slate-200 text-slate-600 hover:bg-slate-50">
-                How it works
-              </Button>
-            </div>
-          </motion.div>
-        </div>
-      </section>
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.3 }}
+              className="flex flex-wrap justify-center gap-4"
+            >
+              <Link
+                href="/sections"
+                className="inline-flex h-12 items-center justify-center rounded-full bg-primary px-8 text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/25 transition-all hover:scale-105"
+              >
+                Browse All Sections
+                <ArrowRight className="ml-2 h-4 w-4" />
+              </Link>
+              <a
+                href="#featured"
+                className="inline-flex h-12 items-center justify-center rounded-full border bg-background px-8 text-sm font-semibold transition-all hover:bg-muted"
+              >
+                View Featured
+              </a>
+            </motion.div>
 
-      {/* Features Grid */}
-      <section className="py-20 bg-white">
-        <div className="container px-4 mx-auto">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <div className="p-8 rounded-3xl bg-slate-50 border border-slate-100">
-              <div className="h-12 w-12 bg-white rounded-xl shadow-sm flex items-center justify-center mb-6">
-                <LayoutTemplate className="h-6 w-6 text-indigo-600" />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.8, delay: 0.4 }}
+              className="mt-20 grid grid-cols-1 gap-8 md:grid-cols-3"
+            >
+              <div className="flex flex-col items-center gap-4 rounded-2xl border bg-card/50 p-8 backdrop-blur-sm">
+                <div className="rounded-full bg-primary/10 p-4">
+                  <Code2 className="h-6 w-6 text-primary" />
+                </div>
+                <h3 className="font-bold">Clean Code</h3>
+                <p className="text-sm text-muted-foreground text-center">Optimized Liquid, CSS, and JS in a single block.</p>
               </div>
-              <h3 className="text-xl font-bold mb-3">Professional Design</h3>
-              <p className="text-slate-500">
-                Crafted by expert designers to match premium themes like Dawn and Archetype.
-              </p>
-            </div>
-            <div className="p-8 rounded-3xl bg-slate-50 border border-slate-100">
-              <div className="h-12 w-12 bg-white rounded-xl shadow-sm flex items-center justify-center mb-6">
-                <CheckCircle2 className="h-6 w-6 text-indigo-600" />
+              <div className="flex flex-col items-center gap-4 rounded-2xl border bg-card/50 p-8 backdrop-blur-sm">
+                <div className="rounded-full bg-primary/10 p-4">
+                  <Zap className="h-6 w-6 text-primary" />
+                </div>
+                <h3 className="font-bold">Lightning Fast</h3>
+                <p className="text-sm text-muted-foreground text-center">Built for performance. Zero impact on page speed.</p>
               </div>
-              <h3 className="text-xl font-bold mb-3">Clean Code</h3>
-              <p className="text-slate-500">
-                Optimized Liquid and Tailwind CSS. No bloat, just performance-ready code.
-              </p>
-            </div>
-            <div className="p-8 rounded-3xl bg-slate-50 border border-slate-100">
-              <div className="h-12 w-12 bg-white rounded-xl shadow-sm flex items-center justify-center mb-6">
-                <Zap className="h-6 w-6 text-indigo-600" />
+              <div className="flex flex-col items-center gap-4 rounded-2xl border bg-card/50 p-8 backdrop-blur-sm">
+                <div className="rounded-full bg-primary/10 p-4">
+                  <Sparkles className="h-6 w-6 text-primary" />
+                </div>
+                <h3 className="font-bold">Full Customization</h3>
+                <p className="text-sm text-muted-foreground text-center">Easily tweak colors, spacing, and layouts via schema.</p>
               </div>
-              <h3 className="text-xl font-bold mb-3">Instant Copy</h3>
-              <p className="text-slate-500">
-                One-click to copy Liquid, schema, and CSS. Paste directly into Shopify code editor.
-              </p>
+            </motion.div>
+          </div>
+        </section>
+
+        {/* Featured Sections */}
+        <section id="featured" className="py-20 lg:py-32">
+          <div className="container mx-auto px-4">
+            <div className="mb-12 flex items-end justify-between">
+              <div>
+                <h2 className="text-3xl font-bold tracking-tight">Featured Sections</h2>
+                <p className="mt-2 text-muted-foreground">The most popular building blocks for modern stores.</p>
+              </div>
+              <Link href="/sections" className="hidden items-center font-semibold text-primary hover:underline md:flex">
+                View all sections <ArrowRight className="ml-1 h-4 w-4" />
+              </Link>
+            </div>
+
+            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+              {featuredSections.map((section, idx) => (
+                <motion.div
+                  key={section.slug}
+                  initial={{ opacity: 0, y: 20 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ duration: 0.5, delay: idx * 0.1 }}
+                >
+                  <SectionCard section={section} />
+                </motion.div>
+              ))}
             </div>
           </div>
-        </div>
-      </section>
-
-      {/* Featured Sections Preview */}
-      <section className="py-20 bg-slate-50">
-        <div className="container px-4 mx-auto">
-          <div className="flex justify-between items-end mb-12">
-            <div>
-              <h2 className="text-3xl font-bold mb-2">Popular Sections</h2>
-              <p className="text-slate-500">Start with our most used components.</p>
-            </div>
-            <Link href="/sections" className="text-indigo-600 font-medium hover:underline hidden md:block">
-              View all sections
-            </Link>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {sections.slice(0, 3).map((section) => (
-              <SectionCard key={section.slug} section={section} />
-            ))}
-          </div>
-
-          <div className="mt-12 text-center md:hidden">
-            <Link href="/sections">
-              <Button variant="outline" className="w-full">View all sections</Button>
-            </Link>
-          </div>
-        </div>
-      </section>
+        </section>
+      </main>
     </div>
   );
 }

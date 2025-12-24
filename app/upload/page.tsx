@@ -9,10 +9,15 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { useSectionStore } from "@/lib/section-store";
 import { toast } from "sonner";
+import { DynamicPreview } from "@/components/shared/DynamicPreview";
+import { Niche } from "@/data/sections";
 import { Loader2, ArrowLeft } from "lucide-react";
 import Link from "next/link";
 
-import { DynamicPreview } from "@/components/shared/DynamicPreview";
+const availableNiches: Niche[] = [
+    "Beauty", "Electronics", "Dropshipping", "Fashion", "Fitness",
+    "Home Decor", "Jewelry", "Luxury", "Minimal", "Ready-To-Use Templates"
+];
 
 export default function UploadPage() {
     const router = useRouter();
@@ -23,6 +28,7 @@ export default function UploadPage() {
     const [name, setName] = useState("");
     const [description, setDescription] = useState("");
     const [category, setCategory] = useState("Custom");
+    const [niches, setNiches] = useState<string[]>([]);
 
     // Single Block Code
     const [code, setCode] = useState<string>(`{% stylesheet %}
@@ -81,7 +87,8 @@ export default function UploadPage() {
                 name,
                 description,
                 category,
-                preview: "/previews/custom-placeholder.png",
+                niches: niches as any,
+                preview: "/custom_section_placeholder.png",
                 code: code,
             });
 
@@ -129,6 +136,26 @@ export default function UploadPage() {
                                             value={category}
                                             onChange={(e) => setCategory(e.target.value)}
                                         />
+                                    </div>
+                                </div>
+                                <div className="space-y-2">
+                                    <Label>Niches (Select multiple)</Label>
+                                    <div className="flex flex-wrap gap-2">
+                                        {availableNiches.map((niche) => (
+                                            <button
+                                                key={niche}
+                                                type="button"
+                                                onClick={() => setNiches(prev =>
+                                                    prev.includes(niche) ? prev.filter(n => n !== niche) : [...prev, niche]
+                                                )}
+                                                className={`rounded-full px-3 py-1 text-xs font-medium transition-all border ${niches.includes(niche)
+                                                    ? "bg-primary text-primary-foreground border-primary"
+                                                    : "bg-background text-muted-foreground border-zinc-200 hover:border-zinc-300"
+                                                    }`}
+                                            >
+                                                {niche}
+                                            </button>
+                                        ))}
                                     </div>
                                 </div>
                                 <div className="space-y-2">
