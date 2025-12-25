@@ -18,6 +18,7 @@ export interface Section {
   category: string;
   preview: string;
   code: string;
+  author_name?: string;
 }
 
 export const sections: Section[] = [

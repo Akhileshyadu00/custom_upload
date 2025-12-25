@@ -17,7 +17,8 @@ export const SectionCard = ({ section }: SectionCardProps) => {
         name = "Untitled Section",
         preview = "/previews/placeholder.png",
         niches = [],
-        code = ""
+        code = "",
+        author_name
     } = section;
 
     const handleCopy = (e: React.MouseEvent) => {
@@ -76,6 +77,11 @@ export const SectionCard = ({ section }: SectionCardProps) => {
                 <h3 className="line-clamp-2 text-sm sm:text-base font-bold leading-tight group-hover:text-primary transition-colors">
                     {name}
                 </h3>
+                {author_name && (
+                    <p className="mt-1 text-xs text-muted-foreground">
+                        by <span className="font-medium text-foreground">{author_name}</span>
+                    </p>
+                )}
             </div>
         </motion.div>
     );

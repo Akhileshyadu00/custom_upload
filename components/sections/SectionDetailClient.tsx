@@ -146,6 +146,12 @@ export function SectionDetailClient({ section }: { section: Section }) {
                                 {section.category}
                             </span>
                         </div>
+                        {section.author_name && (
+                            <div className="mb-4 flex items-center gap-2 text-sm text-zinc-400">
+                                <span>Created by</span>
+                                <span className="text-white font-medium bg-zinc-800 px-2 py-0.5 rounded text-xs">{section.author_name}</span>
+                            </div>
+                        )}
                         <p className="text-zinc-400 text-sm leading-relaxed">{section.description}</p>
                     </div>
                     <div className="flex gap-2">

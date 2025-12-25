@@ -1,87 +1,113 @@
 import { Section } from "@/data/sections";
 import { useState, useEffect } from "react";
+import { supabase } from "@/lib/supabase";
 
 export interface CustomSection extends Section {
     isCustom: true;
-    createdAt: number;
+    createdAt: string;
+    user_id: string;
+    author_name?: string;
 }
-
-const STORAGE_KEY = "custom_sections";
 
 export function useSectionStore() {
     const [customSections, setCustomSections] = useState<CustomSection[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+
+    const fetchSections = async () => {
+        setIsLoading(true);
+        const { data, error } = await supabase
+            .from('sections')
+            .select('*')
+            .order('created_at', { ascending: false });
+
+        if (!error && data) {
+            const mapped = data.map((item: any) => ({
+                slug: item.slug,
+                name: item.title,
+                description: item.description,
+                code: item.code,
+                category: item.category,
+                niches: item.niches,
+                preview: item.preview_url,
+                isCustom: true as true,
+                createdAt: item.created_at,
+                user_id: item.user_id,
+                author_name: item.author_name
+            }));
+            setCustomSections(mapped);
+        }
+        setIsLoading(false);
+    };
+
     const [mounted, setMounted] = useState(false);
 
     useEffect(() => {
         setMounted(true);
-        const stored = localStorage.getItem(STORAGE_KEY);
-        if (stored) {
-            try {
-                const parsed = JSON.parse(stored);
-                // Self-healing: Deduplicate by slug on load
-                const unique = parsed.reduce((acc: CustomSection[], current: CustomSection) => {
-                    if (!current || !current.slug) return acc;
-                    const x = acc.find(item => item.slug === current.slug);
-                    if (!x) {
-                        return acc.concat([current]);
-                    } else {
-                        return acc; // Skip duplicate (keep first found)
-                    }
-                }, []);
+        fetchSections();
 
-                if (unique.length !== parsed.length) {
-                    console.warn("Cleaned up duplicate sections from storage");
-                    localStorage.setItem(STORAGE_KEY, JSON.stringify(unique));
-                }
-                setCustomSections(unique);
-            } catch (e) {
-                console.error("Failed to parse custom sections", e);
-            }
-        }
+        const channel = supabase
+            .channel('sections_updates')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'sections' }, () => {
+                fetchSections();
+            })
+            .subscribe();
 
-        const handleStorageChange = () => {
-            const stored = localStorage.getItem(STORAGE_KEY);
-            if (stored) {
-                setCustomSections(JSON.parse(stored));
-            }
+        return () => {
+            supabase.removeChannel(channel);
         };
-
-        window.addEventListener("section-change", handleStorageChange);
-        return () => window.removeEventListener("section-change", handleStorageChange);
     }, []);
 
-    const addSection = (section: Omit<CustomSection, "createdAt" | "isCustom">) => {
-        const newSection: CustomSection = {
-            ...section,
-            isCustom: true,
-            createdAt: Date.now(),
-        };
+    const addSection = async (section: Omit<CustomSection, "createdAt" | "isCustom" | "user_id">) => {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) throw new Error("User not authenticated");
 
-        // Validate it has 'code'
-        if (!newSection.code) {
-            throw new Error("Section code is required");
-        }
+        const { error } = await supabase.from('sections').insert([{
+            title: section.name,
+            slug: section.slug,
+            description: section.description,
+            code: section.code,
+            category: section.category,
+            niches: section.niches,
+            preview_url: section.preview,
+            user_id: user.id,
+            author_name: section.author_name || user.user_metadata?.full_name || "Anonymous"
+        }]);
 
-        // Remove existing with same slug (Upsert behavior)
-        const others = customSections.filter(s => s.slug !== newSection.slug);
-        const updated = [newSection, ...others];
-
-        setCustomSections(updated);
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
-        window.dispatchEvent(new Event("section-change"));
+        if (error) throw error;
     };
 
-    const removeSection = (slug: string) => {
-        const updated = customSections.filter(s => s.slug !== slug);
-        setCustomSections(updated);
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
-        window.dispatchEvent(new Event("section-change"));
+    const removeSection = async (slug: string) => {
+        const { error } = await supabase.from('sections').delete().eq('slug', slug);
+        if (error) throw error;
+    };
+
+    const updateSection = async (slug: string, updates: Partial<Omit<CustomSection, "createdAt" | "isCustom" | "user_id">>) => {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) throw new Error("User not authenticated");
+
+        const dbUpdates: any = {};
+        if (updates.name) dbUpdates.title = updates.name;
+        if (updates.description) dbUpdates.description = updates.description;
+        if (updates.code) dbUpdates.code = updates.code;
+        if (updates.category) dbUpdates.category = updates.category;
+        if (updates.niches) dbUpdates.niches = updates.niches;
+        if (updates.preview) dbUpdates.preview_url = updates.preview;
+
+        const { error } = await supabase
+            .from('sections')
+            .update(dbUpdates)
+            .eq('slug', slug)
+            .eq('user_id', user.id);
+
+        if (error) throw error;
     };
 
     return {
         customSections,
         addSection,
         removeSection,
+        updateSection,
+        isLoading,
         mounted
     };
 }
