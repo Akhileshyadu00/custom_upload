@@ -11,10 +11,11 @@ import {
 } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input"; // Assuming you have an input component
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
+import { supabase } from "@/lib/supabase";
 
 interface AuthModalProps {
     children?: React.ReactNode;
@@ -35,49 +36,45 @@ export function AuthModal({ children, defaultTab = "login" }: AuthModalProps) {
     const [signupEmail, setSignupEmail] = useState("");
     const [signupPassword, setSignupPassword] = useState("");
 
-    const handleLogin = (e: React.FormEvent) => {
+    const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
         setIsLoading(true);
 
-        // Simulate API call
-        setTimeout(() => {
-            const users = JSON.parse(localStorage.getItem("users") || "[]");
-            const user = users.find((u: any) => u.email === loginEmail && u.password === loginPassword);
+        const { error } = await supabase.auth.signInWithPassword({
+            email: loginEmail,
+            password: loginPassword,
+        });
 
-            if (user) {
-                localStorage.setItem("currentUser", JSON.stringify(user));
-                toast.success("Logged in successfully!");
-                setIsOpen(false);
-                window.dispatchEvent(new Event("auth-change"));
-            } else {
-                toast.error("Invalid email or password");
-            }
-            setIsLoading(false);
-        }, 1000);
+        if (error) {
+            toast.error(error.message);
+        } else {
+            toast.success("Logged in successfully!");
+            setIsOpen(false);
+        }
+        setIsLoading(false);
     };
 
-    const handleSignup = (e: React.FormEvent) => {
+    const handleSignup = async (e: React.FormEvent) => {
         e.preventDefault();
         setIsLoading(true);
 
-        setTimeout(() => {
-            const users = JSON.parse(localStorage.getItem("users") || "[]");
-            if (users.find((u: any) => u.email === signupEmail)) {
-                toast.error("User already exists");
-                setIsLoading(false);
-                return;
-            }
+        const { data, error } = await supabase.auth.signUp({
+            email: signupEmail,
+            password: signupPassword,
+            options: {
+                data: {
+                    full_name: signupName,
+                },
+            },
+        });
 
-            const newUser = { name: signupName, email: signupEmail, password: signupPassword };
-            users.push(newUser);
-            localStorage.setItem("users", JSON.stringify(users));
-            localStorage.setItem("currentUser", JSON.stringify(newUser));
-
-            toast.success("Account created successfully!");
+        if (error) {
+            toast.error(error.message);
+        } else {
+            toast.success("Account created! Check your email to verify.");
             setIsOpen(false);
-            window.dispatchEvent(new Event("auth-change"));
-            setIsLoading(false);
-        }, 1000);
+        }
+        setIsLoading(false);
     };
 
     useEffect(() => {

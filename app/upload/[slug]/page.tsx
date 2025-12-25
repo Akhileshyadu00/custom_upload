@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, use } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,11 +21,13 @@ const availableNiches: Niche[] = [
     "Home Decor", "Jewelry", "Luxury", "Minimal", "Ready-To-Use Templates"
 ];
 
-export default function UploadPage() {
+export default function EditSectionPage({ params }: { params: Promise<{ slug: string }> }) {
+    const { slug } = use(params);
     const router = useRouter();
-    const { addSection } = useSectionStore();
+    const { customSections, updateSection } = useSectionStore();
     const { user, isLoading: authLoading } = useAuth();
     const [isLoading, setIsLoading] = useState(false);
+    const [isFetchingInfo, setIsFetchingInfo] = useState(true);
 
     // Form State
     const [name, setName] = useState("");
@@ -33,41 +35,55 @@ export default function UploadPage() {
     const [category, setCategory] = useState("Custom");
     const [niches, setNiches] = useState<string[]>([]);
     const [previewFile, setPreviewFile] = useState<File | null>(null);
+    const [currentPreviewUrl, setCurrentPreviewUrl] = useState("");
 
-    // Single Block Code
-    const [code, setCode] = useState<string>(`{% stylesheet %}
-  /* Add your CSS here */
-  .my-section { padding: 40px; text-align: center; }
-  .title { font-size: 2rem; color: #333; }
-{% endstylesheet %}
+    // Initial code
+    const [code, setCode] = useState<string>("");
 
-{% javascript %}
-  console.log('Section Loaded');
-{% endjavascript %}
+    // Load initial data
+    useEffect(() => {
+        const fetchSectionData = async () => {
+            // 1. Try to find in store first (fastest)
+            const existing = customSections.find(s => s.slug === slug);
+            if (existing) {
+                setName(existing.name);
+                setDescription(existing.description);
+                setCategory(existing.category);
+                setNiches(existing.niches || []);
+                setCode(existing.code);
+                setCurrentPreviewUrl(existing.preview);
+                setIsFetchingInfo(false);
+                return;
+            }
 
-<div class="my-section">
-  <h2 class="title">{{ section.settings.heading }}</h2>
-  <p>Start editing the Liquid code to see changes live!</p>
-</div>
+            // 2. Fallback to DB fetch if not in store (e.g. direct link)
+            const { data, error } = await supabase
+                .from('sections')
+                .select('*')
+                .eq('slug', slug)
+                .single();
 
-{% schema %}
-{
-  "name": "My Custom Section",
-  "settings": [
-    {
-      "type": "text",
-      "id": "heading",
-      "label": "Heading",
-      "default": "Hello World"
-    }
-  ]
-}
-{% endschema %}`);
+            if (data && !error) {
+                setName(data.title);
+                setDescription(data.description);
+                setCategory(data.category);
+                setNiches(data.niches || []);
+                setCode(data.code);
+                setCurrentPreviewUrl(data.preview_url);
+            } else {
+                toast.error("Section not found");
+                router.push("/profile");
+            }
+            setIsFetchingInfo(false);
+        };
+
+        if (slug) fetchSectionData();
+    }, [slug, customSections, router]);
 
     // Auth check
     useEffect(() => {
         if (!authLoading && !user) {
-            toast.error("Please login to upload sections");
+            toast.error("Please login to edit sections");
             router.push("/");
         }
     }, [user, authLoading, router]);
@@ -82,15 +98,14 @@ export default function UploadPage() {
             return;
         }
 
-        const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)+/g, "");
-        let previewUrl = "/custom_section_placeholder.png";
+        let previewUrl = currentPreviewUrl;
 
         try {
             // Upload Image if selected
             if (previewFile) {
                 const fileExt = previewFile.name.split('.').pop();
                 const fileName = `${slug}-${Date.now()}.${fileExt}`;
-                const { data, error } = await supabase.storage
+                const { error } = await supabase.storage
                     .from('section-previews')
                     .upload(fileName, previewFile);
 
@@ -103,37 +118,35 @@ export default function UploadPage() {
                 previewUrl = publicUrl;
             }
 
-            await addSection({
-                slug,
+            await updateSection(slug, {
                 name,
                 description,
                 category,
                 niches: niches as any,
                 preview: previewUrl,
                 code: code,
-                author_name: user?.user_metadata?.full_name // Explicitly pass it
             });
 
-            toast.success("Section created successfully!");
+            toast.success("Section updated successfully!");
             router.push(`/sections/${slug}?custom=true`);
         } catch (error: any) {
             console.error(error);
-            toast.error(error.message || "Failed to create section");
+            toast.error(error.message || "Failed to update section");
         } finally {
             setIsLoading(false);
         }
     };
 
-    if (authLoading) return <div className="flex h-screen items-center justify-center"><Loader2 className="animate-spin" /></div>;
+    if (authLoading || isFetchingInfo) return <div className="flex h-screen items-center justify-center"><Loader2 className="animate-spin" /></div>;
 
     return (
         <div className="min-h-screen bg-muted/20 pt-24 pb-12 px-4">
             <div className="container mx-auto max-w-[1600px]">
                 <div className="flex items-center justify-between mb-8">
-                    <Link href="/sections" className="inline-flex items-center text-sm text-gray-500 hover:text-black">
-                        <ArrowLeft className="mr-2 h-4 w-4" /> Back to Library
+                    <Link href="/profile" className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground">
+                        <ArrowLeft className="mr-2 h-4 w-4" /> Back to Profile
                     </Link>
-                    <h1 className="text-2xl font-bold">Upload Custom Section</h1>
+                    <h1 className="text-2xl font-bold">Edit Section</h1>
                     <div className="w-24"></div>
                 </div>
 
@@ -143,7 +156,7 @@ export default function UploadPage() {
                         <Card className="border-0 shadow-md">
                             <CardHeader>
                                 <CardTitle>Section Details</CardTitle>
-                                <CardDescription>Define your section metadata.</CardDescription>
+                                <CardDescription>Update your section metadata.</CardDescription>
                             </CardHeader>
                             <CardContent className="space-y-4">
                                 <div className="grid gap-4 md:grid-cols-2">
@@ -170,18 +183,25 @@ export default function UploadPage() {
 
                                 <div className="space-y-2">
                                     <Label htmlFor="preview">Preview Image</Label>
-                                    <div className="border-2 border-dashed border-gray-200 rounded-lg p-4 text-center hover:bg-gray-50 transition cursor-pointer relative">
-                                        <input
-                                            type="file"
-                                            accept="image/*"
-                                            className="absolute inset-0 opacity-0 cursor-pointer"
-                                            onChange={(e) => setPreviewFile(e.target.files?.[0] || null)}
-                                        />
-                                        <div className="flex flex-col items-center gap-2">
-                                            <UploadCloud className="w-8 h-8 text-gray-400" />
-                                            <span className="text-sm text-gray-600">
-                                                {previewFile ? previewFile.name : "Click to upload thumbnail"}
-                                            </span>
+                                    <div className="flex items-center gap-4">
+                                        {currentPreviewUrl && !previewFile && (
+                                            <div className="w-16 h-16 relative rounded-md overflow-hidden bg-muted shrink-0">
+                                                <img src={currentPreviewUrl} alt="Current" className="w-full h-full object-cover" />
+                                            </div>
+                                        )}
+                                        <div className="border-2 border-dashed border-zinc-200 rounded-lg p-4 text-center hover:bg-muted/50 transition cursor-pointer relative flex-1">
+                                            <input
+                                                type="file"
+                                                accept="image/*"
+                                                className="absolute inset-0 opacity-0 cursor-pointer"
+                                                onChange={(e) => setPreviewFile(e.target.files?.[0] || null)}
+                                            />
+                                            <div className="flex flex-col items-center gap-2">
+                                                <UploadCloud className="w-8 h-8 text-gray-400" />
+                                                <span className="text-sm text-gray-600">
+                                                    {previewFile ? previewFile.name : (currentPreviewUrl ? "Replace current image" : "Upload thumbnail")}
+                                                </span>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -222,7 +242,7 @@ export default function UploadPage() {
                         <Card className="border-0 shadow-md flex-1">
                             <CardHeader className="pb-3">
                                 <CardTitle>Liquid Code</CardTitle>
-                                <CardDescription>Paste your full .liquid file content here. Includes Schema, CSS, and JS.</CardDescription>
+                                <CardDescription>Update your .liquid file content here.</CardDescription>
                             </CardHeader>
                             <CardContent>
                                 <form onSubmit={handleSubmit} className="space-y-4">
@@ -236,9 +256,9 @@ export default function UploadPage() {
                                         />
                                     </div>
 
-                                    <Button type="submit" size="lg" className="w-full bg-black hover:bg-zinc-800" disabled={isLoading}>
+                                    <Button type="submit" size="lg" className="w-full" disabled={isLoading}>
                                         {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                        Create & Save Section
+                                        Update Section
                                     </Button>
                                 </form>
                             </CardContent>
@@ -248,23 +268,12 @@ export default function UploadPage() {
                     {/* Right: Live Preview */}
                     <div className="lg:sticky lg:top-24 space-y-4">
                         <div className="flex items-center justify-between px-1">
-                            <h3 className="font-semibold text-gray-900">Live Preview</h3>
-                            <span className="text-xs text-gray-500 bg-white px-2 py-1 rounded border">Autosyncing</span>
+                            <h3 className="font-semibold text-foreground">Live Preview</h3>
+                            <span className="text-xs text-muted-foreground bg-background px-2 py-1 rounded border">Autosyncing</span>
                         </div>
 
                         <div className="aspect-[16/10] w-full bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden relative">
-                            {/* If user uploaded an image and no code changes, we could show it, but dynamic preview is for code */}
                             <DynamicPreview code={code} className="w-full h-full" />
-                        </div>
-
-                        <div className="bg-blue-50 text-blue-800 text-sm p-4 rounded-lg border border-blue-100 flex gap-3 items-start">
-                            <div className="mt-1 shrink-0">ℹ️</div>
-                            <p>
-                                This preview mocks Shopify Liquid logic.
-                                Settings defined in <code>{'{% schema %}'}</code> are automatically populated with their
-                                <code>default</code> values.
-                                Loops like <code>{'{% for block in section.blocks %}'}</code> are simulated.
-                            </p>
                         </div>
                     </div>
                 </div>

@@ -2,13 +2,17 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
-import { Search, Moon, Sun, Menu, X } from "lucide-react";
+import { Search, Moon, Sun, Menu, X, User } from "lucide-react";
 import { useTheme } from "next-themes";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/components/providers/AuthProvider";
+import { AuthModal } from "@/components/auth/AuthModal";
+import { Button } from "@/components/ui/button";
 
 export const Navbar = () => {
     const { theme, setTheme } = useTheme();
+    const { user } = useAuth();
     const [mounted, setMounted] = React.useState(false);
     const [isSearchFocused, setIsSearchFocused] = useState(false);
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -51,6 +55,18 @@ export const Navbar = () => {
                     </div>
 
                     <div className="flex items-center gap-2">
+                        {user ? (
+                            <Link href="/profile">
+                                <Button variant="ghost" size="icon" className="rounded-full">
+                                    <User className="h-5 w-5" />
+                                </Button>
+                            </Link>
+                        ) : (
+                            <AuthModal>
+                                <Button variant="default" size="sm" className="rounded-full px-4">Sign In</Button>
+                            </AuthModal>
+                        )}
+
                         <button
                             onClick={() => mounted && setTheme(theme === "dark" ? "light" : "dark")}
                             className="rounded-full p-2 hover:bg-muted transition-colors relative"
@@ -88,6 +104,13 @@ export const Navbar = () => {
                             <Link href="/" onClick={() => setIsMobileMenuOpen(false)}>Home</Link>
                             <Link href="/sections" onClick={() => setIsMobileMenuOpen(false)}>Sections</Link>
                             <Link href="/upload" onClick={() => setIsMobileMenuOpen(false)}>Create Section</Link>
+                            {user ? (
+                                <Link href="/profile" onClick={() => setIsMobileMenuOpen(false)}>My Profile</Link>
+                            ) : (
+                                <div onClick={() => setIsMobileMenuOpen(false)}>
+                                    <AuthModal />
+                                </div>
+                            )}
                             <div className="relative flex items-center">
                                 <Search className="absolute left-3 h-4 w-4 text-muted-foreground" />
                                 <input
