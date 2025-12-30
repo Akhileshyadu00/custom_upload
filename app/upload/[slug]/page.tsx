@@ -43,7 +43,12 @@ export default function EditSectionPage({ params }: { params: Promise<{ slug: st
     // Load initial data
     useEffect(() => {
         const fetchSectionData = async () => {
-            // 1. Try to find in store first (fastest)
+            if (slug === "new") {
+                setIsFetchingInfo(false);
+                return;
+            }
+
+            // 1. Try to find in store first
             const existing = customSections.find(s => s.slug === slug);
             if (existing) {
                 setName(existing.name);
@@ -52,27 +57,27 @@ export default function EditSectionPage({ params }: { params: Promise<{ slug: st
                 setNiches(existing.niches || []);
                 setCode(existing.code);
                 setCurrentPreviewUrl(existing.preview);
-                setIsFetchingInfo(false);
-                return;
-            }
-
-            // 2. Fallback to DB fetch if not in store (e.g. direct link)
-            const { data, error } = await supabase
-                .from('sections')
-                .select('*')
-                .eq('slug', slug)
-                .single();
-
-            if (data && !error) {
-                setName(data.title);
-                setDescription(data.description);
-                setCategory(data.category);
-                setNiches(data.niches || []);
-                setCode(data.code);
-                setCurrentPreviewUrl(data.preview_url);
             } else {
-                toast.error("Section not found");
-                router.push("/profile");
+                // 2. Fallback: Fetch from Supabase
+                const { data, error } = await supabase
+                    .from('sections')
+                    .select('*')
+                    .eq('slug', slug)
+                    .single();
+
+                if (data) {
+                    setName(data.name);
+                    setDescription(data.description || "");
+                    setCode(data.code);
+                    setCategory(data.category || "Custom");
+                    setNiches(data.niches || []);
+                    setCurrentPreviewUrl(data.preview || "");
+                    // Optionally, add to store cache if you want it available offline immediately
+                    // useSectionStore.setState((state) => ({ customSections: [...state.customSections, data] }));
+                } else {
+                    toast.error("Section not found.");
+                    router.push("/profile");
+                }
             }
             setIsFetchingInfo(false);
         };
@@ -92,38 +97,54 @@ export default function EditSectionPage({ params }: { params: Promise<{ slug: st
         e.preventDefault();
         setIsLoading(true);
 
+        if (!user) {
+            toast.error("You must be logged in to save.");
+            setIsLoading(false);
+            return;
+        }
+
         if (!name || !code) {
             toast.error("Name and Code are required");
             setIsLoading(false);
             return;
         }
 
-        let previewUrl = currentPreviewUrl;
+        let finalPreviewUrl = currentPreviewUrl;
 
         try {
-            // Upload Image if selected
+            // 1. Upload Preview Image to Supabase Storage if a new file is selected
             if (previewFile) {
-                const fileExt = previewFile.name.split('.').pop();
-                const fileName = `${slug}-${Date.now()}.${fileExt}`;
-                const { error } = await supabase.storage
-                    .from('section-previews')
-                    .upload(fileName, previewFile);
+                const fileExtension = previewFile.name.split('.').pop();
+                const fileName = `${user.id}/${slug}-${Date.now()}.${fileExtension}`;
+                const { data: uploadData, error: uploadError } = await supabase.storage
+                    .from("previews")
+                    .upload(fileName, previewFile, {
+                        cacheControl: '3600',
+                        upsert: false,
+                    });
 
-                if (error) throw error;
+                if (uploadError) {
+                    throw new Error(`Failed to upload preview image: ${uploadError.message}`);
+                }
 
-                const { data: { publicUrl } } = supabase.storage
-                    .from('section-previews')
+                // Get public URL for the uploaded image
+                const { data: publicUrlData } = supabase.storage
+                    .from("previews")
                     .getPublicUrl(fileName);
 
-                previewUrl = publicUrl;
+                if (!publicUrlData || !publicUrlData.publicUrl) {
+                    throw new Error("Failed to get public URL for preview image.");
+                }
+                finalPreviewUrl = publicUrlData.publicUrl;
             }
 
+            // Update the section in the store
             await updateSection(slug, {
                 name,
                 description,
                 category,
                 niches: niches as any,
-                preview: previewUrl,
+                preview: finalPreviewUrl,
                 code: code,
             });
 

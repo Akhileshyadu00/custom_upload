@@ -10,6 +10,7 @@ import { vscDarkPlus } from "react-syntax-highlighter/dist/esm/styles/prism";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useSectionStore } from "@/lib/section-store";
+import { DynamicPreview } from "@/components/shared/DynamicPreview";
 
 export default function SectionDetailPage() {
     const { slug } = useParams();
@@ -118,10 +119,9 @@ export default function SectionDetailPage() {
                             animate={{ width: viewport === "desktop" ? "100%" : viewport === "tablet" ? "768px" : "375px" }}
                             className="h-full overflow-hidden rounded-xl border bg-white shadow-2xl"
                         >
-                            <iframe
-                                srcDoc={previewHtml}
+                            <DynamicPreview
+                                code={section.code}
                                 className="h-full w-full"
-                                title="Section Preview"
                             />
                         </motion.div>
                     </div>

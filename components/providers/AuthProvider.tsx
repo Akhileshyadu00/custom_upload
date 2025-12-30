@@ -31,14 +31,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     useEffect(() => {
         // Check active session
-        supabase.auth.getSession().then(({ data: { session } }) => {
-            setSession(session);
-            setUser(session?.user ?? null);
+        supabase.auth.getSession().then(({ data, error }) => {
+            if (error) {
+                console.error("Auth check failed:", error);
+                setSession(null);
+                setUser(null);
+            } else if (data) {
+                setSession(data.session);
+                setUser(data.session?.user ?? null);
+            }
+            setIsLoading(false);
+        }).catch(err => {
+            console.error("Auth Exception:", err);
             setIsLoading(false);
         });
 
         const { data: { subscription } } = supabase.auth.onAuthStateChange(
             (event, session) => {
+                if (localStorage.getItem("demo_guest")) return; // Ignore supabase updates in guest mode
+
                 setSession(session);
                 setUser(session?.user ?? null);
                 setIsLoading(false);
@@ -55,6 +66,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const signOut = async () => {
         await supabase.auth.signOut();
+        setUser(null);
+        setSession(null);
         router.refresh();
     };
 

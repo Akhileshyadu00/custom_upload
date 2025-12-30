@@ -16,8 +16,10 @@ import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { useAuth } from "@/components/providers/AuthProvider";
 
 interface AuthModalProps {
+
     children?: React.ReactNode;
     defaultTab?: "login" | "signup";
 }
@@ -35,6 +37,9 @@ export function AuthModal({ children, defaultTab = "login" }: AuthModalProps) {
     const [signupName, setSignupName] = useState("");
     const [signupEmail, setSignupEmail] = useState("");
     const [signupPassword, setSignupPassword] = useState("");
+
+    const { session } = useAuth();
+
 
     const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -175,7 +180,7 @@ export function AuthModal({ children, defaultTab = "login" }: AuthModalProps) {
                     </TabsContent>
                 </Tabs>
 
-                <div className="mt-4 text-center text-sm text-gray-500">
+                <div className="mt-4 text-center text-xs text-muted-foreground">
                     By continuing, you agree to our Terms of Service and Privacy Policy.
                 </div>
             </DialogContent>
