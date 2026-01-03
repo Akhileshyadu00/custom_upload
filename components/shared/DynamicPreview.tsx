@@ -3,7 +3,7 @@
 import { useEffect, useRef } from "react";
 
 interface DynamicPreviewProps {
-  code: string; // Single block code
+  code: string;
   className?: string;
 }
 
@@ -24,11 +24,7 @@ export function DynamicPreview({ code, className }: DynamicPreviewProps) {
 
     if (isReact) {
       // --- REACT MODE ---
-      // We need to transform the code to be runnable in the browser via Babel
-      // 1. Remove imports (browsers can't handle them easily in this context without import maps, mostly unrelated for single file components)
       let cleanCode = code.replace(/import.*?from.*?;/g, "");
-
-      // 2. Change 'export default function X' to 'function X' and render it
       const componentNameMatch = cleanCode.match(/export\s+default\s+function\s+(\w+)/);
       const componentName = componentNameMatch ? componentNameMatch[1] : "App";
       cleanCode = cleanCode.replace(/export\s+default\s+function/, "function");
@@ -49,7 +45,6 @@ export function DynamicPreview({ code, className }: DynamicPreviewProps) {
             <body>
               <div id="root"></div>
               <script type="text/babel">
-                // lucide-react mock because we can't import it easily
                 const LucideIcons = new Proxy({}, {
                     get: (target, prop) => (props) => {
                         return <span style={{display:'inline-block', border:'1px solid currentColor', width:24, height:24, borderRadius:4, textAlign:'center'}}>i</span>
@@ -59,7 +54,6 @@ export function DynamicPreview({ code, className }: DynamicPreviewProps) {
                 ${cleanCode}
 
                 const root = ReactDOM.createRoot(document.getElementById('root'));
-                // Try to render the identified component
                 try {
                     root.render(<${componentName} />);
                 } catch (e) {
@@ -78,7 +72,6 @@ export function DynamicPreview({ code, className }: DynamicPreviewProps) {
             <head>
               <style>
                 body { margin: 0; padding: 20px; font-family: sans-serif; }
-                /* User CSS */
                 ${code}
               </style>
             </head>
@@ -93,9 +86,8 @@ export function DynamicPreview({ code, className }: DynamicPreviewProps) {
           </html>
         `;
     } else {
-      // --- LIQUID / HTML MODE (Existing Logic) ---
+      // --- LIQUID / HTML MODE ---
 
-      // --- 1. Extract Schema & Styles & JS ---
       let settings: Record<string, any> = {};
       let blocksSchema: Record<string, any> = {};
       const schemaMatch = code.match(/{% schema %}([\s\S]*?){% endschema %}/);
@@ -128,79 +120,176 @@ export function DynamicPreview({ code, className }: DynamicPreviewProps) {
         }
       }
 
-      const styleMatch = code.match(/{% stylesheet %}([\s\S]*?){% endstylesheet %}/) || code.match(/<style>([\s\S]*?)<\/style>/);
-      const extractedCss = styleMatch ? styleMatch[1] : "";
+      let extractedCss = "";
+      const styleMatches = code.match(/<style>([\s\S]*?)<\/style>/g);
+      if (styleMatches) {
+        extractedCss = styleMatches.map(tag => tag.replace(/<\/?style>/g, "")).join("\n");
+      }
+
+      const liquidStyleMatches = code.match(/{% stylesheet %}([\s\S]*?){% endstylesheet %}/g);
+      if (liquidStyleMatches) {
+        extractedCss += "\n" + liquidStyleMatches.map(tag => tag.replace(/{% \/?stylesheet %}/g, "")).join("\n");
+      }
+
+      // Support for {% style %}...{% endstyle %} (alternative Shopify tag)
+      const altStyleMatches = code.match(/{% style %}([\s\S]*?){% endstyle %}/g);
+      if (altStyleMatches) {
+        extractedCss += "\n" + altStyleMatches.map(tag => tag.replace(/{% \/?style %}/g, "")).join("\n");
+      }
 
       const jsMatch = code.match(/{% javascript %}([\s\S]*?){% endjavascript %}/) || code.match(/<script>([\s\S]*?)<\/script>/);
       const extractedJs = jsMatch ? jsMatch[1] : "";
 
       let extractedHtml = code
         .replace(/{% stylesheet %}[\s\S]*?{% endstylesheet %}/g, "")
+        .replace(/{% style %}[\s\S]*?{% endstyle %}/g, "") // Remove {% style %} blocks
         .replace(/<style>[\s\S]*?<\/style>/g, "")
         .replace(/{% javascript %}[\s\S]*?{% endjavascript %}/g, "")
         .replace(/<script>[\s\S]*?<\/script>/g, "")
         .replace(/{% schema %}[\s\S]*?{% endschema %}/g, "");
 
-      // --- 2. Advanced Mocking Engine ---
-      // Updated Regex: Matches parameters after 'section.blocks' like 'limit: 3', 'reversed', etc.
-      const loopRegex = /{%[-]?\s*for\s+(\w+)\s+in\s+section\.blocks.*?[-]?%}([\s\S]*?){%[-]?\s*endfor\s*[-]?%}/g;
+      // --- Advanced Mocking Engine ---
 
-      extractedHtml = extractedHtml.replace(loopRegex, (match, loopVar, loopBody) => {
-        const blockTypes = Object.keys(blocksSchema);
-        let generatedContent = "";
-        const iterations = blockTypes.length > 0 ? blockTypes.length : 3;
-        for (let i = 0; i < iterations; i++) {
-          let itemHtml = loopBody;
-          const blockType = blockTypes[i] || 'unknown';
-          const defaults = blocksSchema[blockType] || {};
-          Object.keys(defaults).forEach(key => {
-            const val = defaults[key];
-            const r = new RegExp(`{{\\s*${loopVar}\\.settings\\.${key}\\s*}}`, 'g');
-            itemHtml = itemHtml.replace(r, val);
+      try {
+        // Helper to solve nested tags by processing innermost first
+        const processTagsRecursively = (html: string, regex: RegExp, processor: (match: any, ...args: any[]) => string) => {
+          let processed = html;
+          let maxLoops = 50; // Prevent infinite loops
+          while (regex.test(processed) && maxLoops > 0) {
+            processed = processed.replace(regex, processor);
+            maxLoops--;
+          }
+          return processed;
+        };
+
+        const processControlFlow = (html: string) => {
+          let processed = html;
+
+          // --- Condition Evaluator ---
+          const evaluateCondition = (condition: string) => {
+            const c = condition.trim().replace(/^['"]+|['"]+$/g, ''); // Strip quotes
+            if (!c) return false;
+
+            // Handle != blank / == blank
+            if (c.includes("!= blank")) return true; // simplified: almost everything is not blank in mock
+            if (c.includes("== blank")) return false;
+
+            // Handle == 
+            if (c.includes("==")) {
+              const parts = c.split("==");
+              return parts[0].trim().replace(/['"]/g, '') === parts[1].trim().replace(/['"]/g, '');
+            }
+            // Handle != 
+            if (c.includes("!=")) {
+              const parts = c.split("!=");
+              return parts[0].trim().replace(/['"]/g, '') !== parts[1].trim().replace(/['"]/g, '');
+            }
+
+            // Boolean check
+            if (c === "true") return true;
+            if (c === "false") return false;
+
+            // Default truthy
+            return true;
+          };
+
+          // Case/When - handling simple non-nested case for now as complex nested case is rare in section schema
+          const caseRegex = /{%-?\s*case\s+([^{}]+?)\s*-?%}([\s\S]*?){%-?\s*endcase\s*-?%}/g;
+          processed = processed.replace(caseRegex, (match, variable, body) => {
+            const cleanVar = variable.trim().replace(/['"]/g, "");
+            const whenRegex = /{%-?\s*when\s+['"]?([^'"]+?)['"]?\s*-?%}([\s\S]*?)(?=(?:{%-?\s*when|{%-?\s*endcase))/g;
+            let result = "";
+            let matchWhen;
+            // We need to capture all whens
+            while ((matchWhen = whenRegex.exec(body)) !== null) {
+              if (matchWhen[1] === cleanVar) {
+                result = matchWhen[2];
+                break; // Render first match
+              }
+            }
+            return result;
           });
-          const cleanupRegex = new RegExp(`{{\\s*${loopVar}\\.settings\\.\\w+\\s*}}`, 'g');
-          itemHtml = itemHtml.replace(cleanupRegex, "Lorem Ipsum");
-          generatedContent += itemHtml;
-        }
-        return generatedContent;
-      });
 
+          // If: Match innermost (no internal if/endif)
+          // Using [\s\S]*? for condition to allow multi-line conditions and any chars
+          const ifRegex = /{%-?\s*if\s+([\s\S]*?)\s*-?%}((?:(?!{%\s*if)[\s\S])*?){%-?\s*endif\s*-?%}/;
+          processed = processTagsRecursively(processed, ifRegex, (match, condition, body) => {
+            // console.log("Matched IF:", condition);
+            return evaluateCondition(condition) ? body : "";
+          });
+
+          // Unless: Match innermost
+          const unlessRegex = /{%-?\s*unless\s+([\s\S]*?)\s*-?%}((?:(?!{%\s*unless)[\s\S])*?){%-?\s*endunless\s*-?%}/;
+          processed = processTagsRecursively(processed, unlessRegex, (match, condition, body) => {
+            return !evaluateCondition(condition) ? body : "";
+          });
+
+          return processed;
+        };
+
+        const loopRegex = /{%-?\s*for\s+(\w+)\s+in\s+section\.blocks.*?[-]?%}([\s\S]*?){%-?\s*endfor\s*[-]?%}/g;
+
+        extractedHtml = extractedHtml.replace(loopRegex, (match, loopVar, loopBody) => {
+          const blockTypes = Object.keys(blocksSchema);
+          if (blockTypes.length === 0) return ""; // No blocks? render nothing
+
+          let generatedContent = "";
+
+          // SIMULATE DATA: Repeat blocks to fill a grid (e.g. 4 items)
+          let simulatedBlocks = [];
+          for (let i = 0; i < 4; i++) {
+            simulatedBlocks.push(...blockTypes);
+          }
+
+          simulatedBlocks.forEach((blockType, index) => {
+            let itemHtml = loopBody;
+            const defaults = blocksSchema[blockType] || {};
+
+            // Replace block props
+            itemHtml = itemHtml.replace(new RegExp(`${loopVar}\\.type`, 'g'), `'${blockType}'`);
+            itemHtml = itemHtml.replace(new RegExp(`${loopVar}\\.id`, 'g'), `'block-${blockType}-${index}'`);
+
+            // Replace settings
+            Object.keys(defaults).forEach(key => {
+              const val = defaults[key];
+              itemHtml = itemHtml.replace(new RegExp(`{{\\s*${loopVar}\\.settings\\.${key}\\s*}}`, 'g'), val);
+            });
+
+            // Cleanup missing block settings
+            itemHtml = itemHtml.replace(new RegExp(`{{\\s*${loopVar}\\.settings\\.\\w+\\s*}}`, 'g'), "");
+
+            // Process IF/Unless inside Loop
+            itemHtml = processControlFlow(itemHtml);
+            generatedContent += itemHtml;
+          });
+          return generatedContent;
+        });
+
+        // Process global control flow
+        extractedHtml = processControlFlow(extractedHtml);
+
+      } catch (e) {
+        console.error("Liquid Mock Engine Error:", e);
+      }
+
+      // Cleanup
       Object.keys(settings).forEach(key => {
         const val = settings[key];
         const regex = new RegExp(`{{\\s*section\\.settings\\.${key}\\s*}}`, 'g');
-        const escapeRegex = new RegExp(`{{\\s*section\\.settings\\.${key}\\s*\\|\\s*escape\\s*}}`, 'g');
-        extractedHtml = extractedHtml.replace(regex, val).replace(escapeRegex, val);
+        extractedHtml = extractedHtml.replace(regex, val);
+        extractedCss = extractedCss.replace(regex, val); // FIX: Replace in CSS too
       });
 
-      extractedHtml = extractedHtml.replace(/{{\s*['"].*?['"]\s*\|\s*asset_url\s*}}/g, "https://placehold.co/600x400/EEE/31343C?text=Asset");
-      extractedHtml = extractedHtml.replace(/{{\s*.*?\|\s*image_url.*?\s*}}/g, "https://placehold.co/600x400/EEE/31343C?text=Image");
-      extractedHtml = extractedHtml.replace(/{{\s*.*?\|\s*placeholder_svg_tag.*?\s*}}/g, '<div style="background:#eee;width:100%;height:100%;min-height:200px;display:flex;align-items:center;justify-content:center;color:#888;">Placeholder SVG</div>');
-      extractedHtml = extractedHtml.replace(/{{\s*.*?\|\s*money.*?\s*}}/g, "$19.99");
-      extractedHtml = extractedHtml.replace(/{{\s*['"](.*?)['"]\s*\|\s*t\s*}}/g, (match, key) => {
-        const parts = key.split('.');
-        return parts[parts.length - 1].replace(/_/g, ' ');
-      });
-
-      extractedHtml = extractedHtml.replace(/{{\s*section\.id\s*}}/g, "custom-preview-123");
-
-      extractedHtml = extractedHtml.replace(/{%\s*render\s*['"](.*?)['"].*?%}/g, (match, snippet) => {
-        if (snippet.includes('icon')) {
-          return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:24px;height:24px;display:inline-block;"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="16"></line><line x1="8" y1="12" x2="16" y2="12"></line></svg><!-- Snippet: ${snippet} -->`;
-        }
-        return `<!-- Rendered Snippet: ${snippet} -->`;
-      });
-
-      extractedHtml = extractedHtml.replace(/{%\s*form\s*.*?%}/g, '<form action="#" method="post" onsubmit="event.preventDefault(); alert(\'Form submitted (Preview)\');">');
-      extractedHtml = extractedHtml.replace(/{%\s*endform\s*%}/g, '</form>');
-      extractedHtml = extractedHtml.replace(/{%\s*assign\s+.*?%}/g, "");
-      extractedHtml = extractedHtml.replace(/{%\s*capture\s+.*?%}([\s\S]*?){%\s*endcapture\s*%}/g, "");
-      extractedHtml = extractedHtml.replace(/{%\s*case\s+.*?%}/g, "");
-      extractedHtml = extractedHtml.replace(/{%\s*when\s+.*?%}/g, "");
-      extractedHtml = extractedHtml.replace(/{%\s*else\s*%}/g, "");
-      extractedHtml = extractedHtml.replace(/{%\s*endcase\s*%}/g, "");
-
-      extractedHtml = extractedHtml.replace(/{%[\s\S]*?%}/g, "");
-      extractedHtml = extractedHtml.replace(/{{[\s\S]*?}}/g, "");
+      extractedHtml = extractedHtml
+        .replace(/{{\s*['"].*?['"]\s*\|\s*asset_url\s*}}/g, "https://placehold.co/600x400/EEE/31343C?text=Asset")
+        .replace(/{{\s*.*?\|\s*image_url.*?\s*}}/g, "https://placehold.co/600x400/EEE/31343C?text=Image")
+        .replace(/{{\s*section\.id\s*}}/g, "custom-preview-123")
+        .replace(/{%\s*render\s*['"](.*?)['"].*?%}/g, "<!-- Rendered Snippet -->")
+        .replace(/{%\s*form\s*.*?%}/g, '<form onsubmit="event.preventDefault();">')
+        .replace(/{%\s*endform\s*%}/g, '</form>')
+        // Clean remaining tags
+        .replace(/{%\s*.*?\s*%}/g, "")
+        .replace(/{{.*?}}/g, "");
 
       finalContent = `
           <!DOCTYPE html>
@@ -219,12 +308,7 @@ export function DynamicPreview({ code, className }: DynamicPreviewProps) {
                 try {
                     ${extractedJs}
                 } catch(e) { console.log('Preview JS Error', e) }
-                
-                document.addEventListener('click', (e) => {
-                    if(e.target.tagName === 'A') {
-                        e.preventDefault();
-                    }
-                });
+                document.addEventListener('click', (e) => { if(e.target.tagName === 'A') e.preventDefault(); });
               </script>
             </body>
           </html>
@@ -239,7 +323,7 @@ export function DynamicPreview({ code, className }: DynamicPreviewProps) {
   return (
     <div className={`w-full h-full bg-white relative ${className}`}>
       <div className="absolute top-2 left-2 bg-yellow-100 text-yellow-800 text-xs px-2 py-1 rounded z-10 font-mono opacity-50 hover:opacity-100 transition-opacity pointer-events-none">
-        {code.includes("import React") || code.includes("export default function") || code.includes("return (") ? "React Mode" : (code.includes("{") && !code.includes("<") && code.includes(":") && !code.includes("schema")) ? "CSS Mode" : "Liquid Mode"}
+        v2 {code.includes("import React") || code.includes("return (") ? "React Mode" : (!code.includes("<") && code.includes("{") && code.includes(":")) ? "CSS Mode" : "Liquid Mode"}
       </div>
       <iframe
         ref={iframeRef}
